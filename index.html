@@ -2,21 +2,26 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AAIB Platinum Challenge</title>
     <!-- Phaser 3 Engine CDN -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
     <style>
-        body {
+        * {
+            box-sizing: border-box;
+        }
+        body, html {
             margin: 0;
             padding: 0;
+            width: 100%;
+            height: 100%;
             background-color: #0b1a30;
             overflow: hidden;
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
         #game-container {
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -28,19 +33,23 @@
 <div id="game-container"></div>
 
 <script>
+    // حساب أبعاد الشاشة الحقيقية للجهاز
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+
     const config = {
         type: Phaser.AUTO,
-        width: 360,
-        height: 640,
+        width: screenWidth,
+        height: screenHeight,
         parent: 'game-container',
         scale: {
-            mode: Phaser.Scale.FIT,
+            mode: Phaser.Scale.RESIZE,
             autoCenter: Phaser.Scale.CENTER_BOTH
         },
         physics: {
             default: 'arcade',
             arcade: {
-                gravity: { y: 300 },
+                gravity: { y: screenHeight * 0.45 }, // تدرج الجاذبية يناسب ارتفاع الشاشة
                 debug: false
             }
         },
@@ -65,23 +74,30 @@
     function preload() {
         this.load.image('playerCardAsset', 'aaib_card.png');
 
+        // أحجام العناصر الهابطة تتناسب مع عرض الشاشة (8% من عرض الشاشة)
+        let itemSize = screenWidth * 0.08;
+
         let coinGraphics = this.make.graphics({x: 0, y: 0, add: false});
         coinGraphics.fillStyle(0xffd700, 1);
-        coinGraphics.fillCircle(15, 15, 15);
-        coinGraphics.generateTexture('coin', 30, 30);
+        coinGraphics.fillCircle(itemSize / 2, itemSize / 2, itemSize / 2);
+        coinGraphics.generateTexture('coin', itemSize, itemSize);
 
         let hazardGraphics = this.make.graphics({x: 0, y: 0, add: false});
         hazardGraphics.fillStyle(0xe74c3c, 1);
-        hazardGraphics.fillCircle(15, 15, 15);
-        hazardGraphics.generateTexture('hazard', 30, 30);
+        hazardGraphics.fillCircle(itemSize / 2, itemSize / 2, itemSize / 2);
+        hazardGraphics.generateTexture('hazard', itemSize, itemSize);
     }
 
     function create() {
-        player = this.physics.add.sprite(180, 580, 'playerCardAsset');
+        // تحديد موضع Y للكارت بنسبة 88% من ارتفاع الشاشة ليكون دايماً فوق الأسفل بمسافة ممتازة
+        let playerY = screenHeight * 0.88;
         
-        // --- إجبار المقاس الصغير (80px عرض × 45px ارتفاع) ---
-        player.setDisplaySize(80, 45);
-        player.body.setSize(player.width, player.height);
+        player = this.physics.add.sprite(screenWidth / 2, playerY, 'playerCardAsset');
+        
+        // جعل عرض الكارت يساوي 22% من عرض الشاشة الحقيقية للموبايل
+        let cardTargetWidth = screenWidth * 0.22;
+        let scaleFactor = cardTargetWidth / player.width;
+        player.setScale(scaleFactor);
         
         player.setCollideWorldBounds(true);
         player.body.setAllowGravity(false);
@@ -89,17 +105,21 @@
         coins = this.physics.add.group();
         hazards = this.physics.add.group();
 
-        scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '20px', fill: '#ffffff' });
-        timerText = this.add.text(230, 16, 'Time: 30s', { fontSize: '20px', fill: '#ffffff' });
+        // نصوص النتيجة والوقت بحجم خط متناسب مع الشاشة
+        let fontSize = Math.max(16, Math.floor(screenWidth * 0.045)) + 'px';
+        scoreText = this.add.text(16, 20, 'Score: 0', { fontSize: fontSize, fill: '#ffffff', fontWeight: 'bold' });
+        timerText = this.add.text(screenWidth - 120, 20, 'Time: 30s', { fontSize: fontSize, fill: '#ffffff', fontWeight: 'bold' });
 
+        // التحريك بالتاتش للـ Pointer
         this.input.on('pointermove', function (pointer) {
             if (!isGameOver) {
-                player.x = Phaser.Math.Clamp(pointer.x, (player.displayWidth/2), 360 - (player.displayWidth/2));
+                let halfCardWidth = player.displayWidth / 2;
+                player.x = Phaser.Math.Clamp(pointer.x, halfCardWidth, screenWidth - halfCardWidth);
             }
         });
 
         this.time.addEvent({
-            delay: 700,
+            delay: 650,
             callback: spawnItem,
             callbackScope: this,
             loop: true
@@ -121,13 +141,16 @@
     function spawnItem() {
         if (isGameOver) return;
 
-        let x = Phaser.Math.Between(30, 330);
+        let padding = screenWidth * 0.1;
+        let x = Phaser.Math.Between(padding, screenWidth - padding);
+        let fallSpeed = Phaser.Math.Between(screenHeight * 0.25, screenHeight * 0.4);
+
         if (Math.random() < 0.7) {
             let coin = coins.create(x, 0, 'coin');
-            coin.setVelocityY(Phaser.Math.Between(150, 250));
+            coin.setVelocityY(fallSpeed);
         } else {
             let hazard = hazards.create(x, 0, 'hazard');
-            hazard.setVelocityY(Phaser.Math.Between(200, 300));
+            hazard.setVelocityY(fallSpeed * 1.1);
         }
     }
 
@@ -158,12 +181,24 @@
         isGameOver = true;
         this.physics.pause();
 
-        let bg = this.add.rectangle(180, 320, 320, 220, 0x000000, 0.85);
-        this.add.text(180, 250, 'GAME OVER!', { fontSize: '24px', fill: '#ffffff', fontWeight: 'bold' }).setOrigin(0.5);
-        this.add.text(180, 290, 'Your Score: ' + score, { fontSize: '20px', fill: '#ffd700' }).setOrigin(0.5);
+        let boxWidth = screenWidth * 0.85;
+        let boxHeight = screenHeight * 0.35;
 
-        let ctaButton = this.add.text(180, 350, 'Apply For AAIB Card', { 
-            fontSize: '16px', 
+        let bg = this.add.rectangle(screenWidth / 2, screenHeight / 2, boxWidth, boxHeight, 0x000000, 0.88);
+        
+        this.add.text(screenWidth / 2, screenHeight / 2 - 40, 'GAME OVER!', { 
+            fontSize: (screenWidth * 0.06) + 'px', 
+            fill: '#ffffff', 
+            fontWeight: 'bold' 
+        }).setOrigin(0.5);
+
+        this.add.text(screenWidth / 2, screenHeight / 2, 'Your Score: ' + score, { 
+            fontSize: (screenWidth * 0.05) + 'px', 
+            fill: '#ffd700' 
+        }).setOrigin(0.5);
+
+        let ctaButton = this.add.text(screenWidth / 2, screenHeight / 2 + 50, 'Apply For AAIB Card', { 
+            fontSize: (screenWidth * 0.04) + 'px', 
             fill: '#0b1a30', 
             backgroundColor: '#ffffff', 
             padding: { x: 15, y: 8 } 
