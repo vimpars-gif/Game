@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AAIB Platinum Challenge</title>
+    <!-- Phaser 3 Engine CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0b1a30; /* Dark premium blue background */
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #game-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container"></div>
+
+<script>
+    const config = {
+        type: Phaser.AUTO,
+        width: 360,
+        height: 640,
+        parent: 'game-container',
+        scale: {
+            mode: Phaser.Scale.FIT,
+            autoCenter: Phaser.Scale.CENTER_BOTH
+        },
+        physics: {
+            default: 'arcade',
+            arcade: {
+                gravity: { y: 300 },
+                debug: false
+            }
+        },
+        scene: {
+            preload: preload,
+            create: create,
+            update: update
+        }
+    };
+
+    let player;
+    let coins;
+    let hazards;
+    let score = 0;
+    let scoreText;
+    let timerText;
+    let timeLeft = 30;
+    let isGameOver = false;
+
+    const game = new Phaser.Game(config);
+
+    function preload() {
+        // Load AAIB Card Image
+        this.load.image('playerCardAsset', 'aaib_card.png');
+
+        // Placeholder graphics for collectible items
+        // 1. Gold Coin (+ Points)
+        let coinGraphics = this.make.graphics({x: 0, y: 0, add: false});
+        coinGraphics.fillStyle(0xffd700, 1);
+        coinGraphics.fillCircle(15, 15, 15);
+        coinGraphics.generateTexture('coin', 30, 30);
+
+        // 2. Hazard / Unexpected Expense (- Points)
+        let hazardGraphics = this.make.graphics({x: 0, y: 0, add: false});
+        hazardGraphics.fillStyle(0xe74c3c, 1);
+        hazardGraphics.fillCircle(15, 15, 15);
+        hazardGraphics.generateTexture('hazard', 30, 30);
+    }
+
+    function create() {
+        // Add AAIB Card Player
+        player = this.physics.add.sprite(180, 580, 'playerCardAsset');
+        player.setScale(0.5); // Adjust size to fit screen
+        player.setCollideWorldBounds(true);
+        player.body.setAllowGravity(false);
+
+        // Groups
+        coins = this.physics.add.group();
+        hazards = this.physics.add.group();
+
+        // UI Text in English
+        scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '20px', fill: '#ffffff' });
+        timerText = this.add.text(230, 16, 'Time: 30s', { fontSize: '20px', fill: '#ffffff' });
+
+        // Touch Control for Mobile
+        this.input.on('pointermove', function (pointer) {
+            if (!isGameOver) {
+                player.x = Phaser.Math.Clamp(pointer.x, (player.displayWidth/2), 360 - (player.displayWidth/2));
+            }
+        });
+
+        // Item Spawner
+        this.time.addEvent({
+            delay: 700,
+            callback: spawnItem,
+            callbackScope: this,
+            loop: true
+        });
+
+        // Game Countdown Timer
+        this.time.addEvent({
+            delay: 1000,
+            callback: updateTimer,
+            callbackScope: this,
+            loop: true
+        });
+
+        // Collisions
+        this.physics.add.overlap(player, coins, collectCoin, null, this);
+        this.physics.add.overlap(player, hazards, hitHazard, null, this);
+    }
+
+    function update() {
+        // Game loop updates if needed
+    }
+
+    function spawnItem() {
+        if (isGameOver) return;
+
+        let x = Phaser.Math.Between(30, 330);
+        // 70% chance for Coin, 30% for Hazard
+        if (Math.random() < 0.7) {
+            let coin = coins.create(x, 0, 'coin');
+            coin.setVelocityY(Phaser.Math.Between(150, 250));
+        } else {
+            let hazard = hazards.create(x, 0, 'hazard');
+            hazard.setVelocityY(Phaser.Math.Between(200, 300));
+        }
+    }
+
+    function collectCoin(player, coin) {
+        coin.disableBody(true, true);
+        score += 10;
+        scoreText.setText('Score: ' + score);
+    }
+
+    function hitHazard(player, hazard) {
+        hazard.disableBody(true, true);
+        score = Math.max(0, score - 15);
+        scoreText.setText('Score: ' + score);
+    }
+
+    function updateTimer() {
+        if (isGameOver) return;
+
+        timeLeft--;
+        timerText.setText('Time: ' + timeLeft + 's');
+
+        if (timeLeft <= 0) {
+            endGame.call(this);
+        }
+    }
+
+    function endGame() {
+        isGameOver = true;
+        this.physics.pause();
+
+        // Game Over Overlay
+        let bg = this.add.rectangle(180, 320, 320, 220, 0x000000, 0.85);
+        this.add.text(180, 250, 'GAME OVER!', { fontSize: '24px', fill: '#ffffff', fontWeight: 'bold' }).setOrigin(0.5);
+        this.add.text(180, 290, 'Your Score: ' + score, { fontSize: '20px', fill: '#ffd700' }).setOrigin(0.5);
+
+        // Call-to-action button
+        let ctaButton = this.add.text(180, 350, 'Apply For AAIB Card', { 
+            fontSize: '16px', 
+            fill: '#0b1a30', 
+            backgroundColor: '#ffffff', 
+            padding: { x: 15, y: 8 } 
+        }).setOrigin(0.5);
+
+        ctaButton.setInteractive({ useHandCursor: true });
+        ctaButton.on('pointerdown', () => {
+            alert('Redirecting to AAIB Card Application Page...');
+        });
+    }
+</script>
+
+</body>
+</html>
