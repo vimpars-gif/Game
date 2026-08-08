@@ -2,22 +2,27 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>AAIB Platinum Challenge</title>
     <!-- Phaser 3 Engine CDN -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
     <style>
         * {
             box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
-        body, html {
+        html, body {
             margin: 0;
             padding: 0;
-            width: 100%;
-            height: 100%;
+            width: 100vw;
+            height: 100vh;
             background-color: #0b1a30;
             overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         #game-container {
             width: 100%;
@@ -33,23 +38,19 @@
 <div id="game-container"></div>
 
 <script>
-    // حساب أبعاد الشاشة الحقيقية للجهاز
-    const screenWidth = window.innerWidth;
-    const screenHeight = window.innerHeight;
-
     const config = {
         type: Phaser.AUTO,
-        width: screenWidth,
-        height: screenHeight,
+        width: 360,
+        height: 640,
         parent: 'game-container',
         scale: {
-            mode: Phaser.Scale.RESIZE,
+            mode: Phaser.Scale.FIT,
             autoCenter: Phaser.Scale.CENTER_BOTH
         },
         physics: {
             default: 'arcade',
             arcade: {
-                gravity: { y: screenHeight * 0.45 }, // تدرج الجاذبية يناسب ارتفاع الشاشة
+                gravity: { y: 350 },
                 debug: false
             }
         },
@@ -74,47 +75,42 @@
     function preload() {
         this.load.image('playerCardAsset', 'aaib_card.png');
 
-        // أحجام العناصر الهابطة تتناسب مع عرض الشاشة (8% من عرض الشاشة)
-        let itemSize = screenWidth * 0.08;
-
+        // عناصر النقاط والعوائق
         let coinGraphics = this.make.graphics({x: 0, y: 0, add: false});
         coinGraphics.fillStyle(0xffd700, 1);
-        coinGraphics.fillCircle(itemSize / 2, itemSize / 2, itemSize / 2);
-        coinGraphics.generateTexture('coin', itemSize, itemSize);
+        coinGraphics.fillCircle(15, 15, 15);
+        coinGraphics.generateTexture('coin', 30, 30);
 
         let hazardGraphics = this.make.graphics({x: 0, y: 0, add: false});
         hazardGraphics.fillStyle(0xe74c3c, 1);
-        hazardGraphics.fillCircle(itemSize / 2, itemSize / 2, itemSize / 2);
-        hazardGraphics.generateTexture('hazard', itemSize, itemSize);
+        hazardGraphics.fillCircle(15, 15, 15);
+        hazardGraphics.generateTexture('hazard', 30, 30);
     }
 
     function create() {
-        // تحديد موضع Y للكارت بنسبة 88% من ارتفاع الشاشة ليكون دايماً فوق الأسفل بمسافة ممتازة
-        let playerY = screenHeight * 0.88;
+        // مكان الكارت واعتمدنا أبعاد ثابتة للـ Canvas لتفادي الشاشات المخلّة
+        player = this.physics.add.sprite(180, 560, 'playerCardAsset');
         
-        player = this.physics.add.sprite(screenWidth / 2, playerY, 'playerCardAsset');
+        // تحديد العرض والارتفاع بوضوح (عرض 90px وارتفاع 55px)
+        player.setDisplaySize(90, 55);
         
-        // جعل عرض الكارت يساوي 22% من عرض الشاشة الحقيقية للموبايل
-        let cardTargetWidth = screenWidth * 0.22;
-        let scaleFactor = cardTargetWidth / player.width;
-        player.setScale(scaleFactor);
-        
+        // ضبط الحدود الفيزيائية لتطابق العرض الجديد
+        player.body.setSize(player.width, player.height);
         player.setCollideWorldBounds(true);
         player.body.setAllowGravity(false);
 
         coins = this.physics.add.group();
         hazards = this.physics.add.group();
 
-        // نصوص النتيجة والوقت بحجم خط متناسب مع الشاشة
-        let fontSize = Math.max(16, Math.floor(screenWidth * 0.045)) + 'px';
-        scoreText = this.add.text(16, 20, 'Score: 0', { fontSize: fontSize, fill: '#ffffff', fontWeight: 'bold' });
-        timerText = this.add.text(screenWidth - 120, 20, 'Time: 30s', { fontSize: fontSize, fill: '#ffffff', fontWeight: 'bold' });
+        scoreText = this.add.text(16, 20, 'Score: 0', { fontSize: '20px', fill: '#ffffff', fontWeight: 'bold' });
+        timerText = this.add.text(220, 20, 'Time: 30s', { fontSize: '20px', fill: '#ffffff', fontWeight: 'bold' });
 
-        // التحريك بالتاتش للـ Pointer
+        // التفاعل بالتاتش
         this.input.on('pointermove', function (pointer) {
             if (!isGameOver) {
-                let halfCardWidth = player.displayWidth / 2;
-                player.x = Phaser.Math.Clamp(pointer.x, halfCardWidth, screenWidth - halfCardWidth);
+                // تحويل إحداثيات التاتش لإحداثيات الكانفاس الداخلية
+                let touchX = pointer.x;
+                player.x = Phaser.Math.Clamp(touchX, 45, 315);
             }
         });
 
@@ -141,16 +137,13 @@
     function spawnItem() {
         if (isGameOver) return;
 
-        let padding = screenWidth * 0.1;
-        let x = Phaser.Math.Between(padding, screenWidth - padding);
-        let fallSpeed = Phaser.Math.Between(screenHeight * 0.25, screenHeight * 0.4);
-
+        let x = Phaser.Math.Between(30, 330);
         if (Math.random() < 0.7) {
             let coin = coins.create(x, 0, 'coin');
-            coin.setVelocityY(fallSpeed);
+            coin.setVelocityY(Phaser.Math.Between(180, 260));
         } else {
             let hazard = hazards.create(x, 0, 'hazard');
-            hazard.setVelocityY(fallSpeed * 1.1);
+            hazard.setVelocityY(Phaser.Math.Between(220, 310));
         }
     }
 
@@ -181,27 +174,15 @@
         isGameOver = true;
         this.physics.pause();
 
-        let boxWidth = screenWidth * 0.85;
-        let boxHeight = screenHeight * 0.35;
+        let bg = this.add.rectangle(180, 320, 300, 200, 0x000000, 0.88);
+        this.add.text(180, 250, 'GAME OVER!', { fontSize: '22px', fill: '#ffffff', fontWeight: 'bold' }).setOrigin(0.5);
+        this.add.text(180, 290, 'Your Score: ' + score, { fontSize: '18px', fill: '#ffd700' }).setOrigin(0.5);
 
-        let bg = this.add.rectangle(screenWidth / 2, screenHeight / 2, boxWidth, boxHeight, 0x000000, 0.88);
-        
-        this.add.text(screenWidth / 2, screenHeight / 2 - 40, 'GAME OVER!', { 
-            fontSize: (screenWidth * 0.06) + 'px', 
-            fill: '#ffffff', 
-            fontWeight: 'bold' 
-        }).setOrigin(0.5);
-
-        this.add.text(screenWidth / 2, screenHeight / 2, 'Your Score: ' + score, { 
-            fontSize: (screenWidth * 0.05) + 'px', 
-            fill: '#ffd700' 
-        }).setOrigin(0.5);
-
-        let ctaButton = this.add.text(screenWidth / 2, screenHeight / 2 + 50, 'Apply For AAIB Card', { 
-            fontSize: (screenWidth * 0.04) + 'px', 
+        let ctaButton = this.add.text(180, 340, 'Apply For AAIB Card', { 
+            fontSize: '15px', 
             fill: '#0b1a30', 
             backgroundColor: '#ffffff', 
-            padding: { x: 15, y: 8 } 
+            padding: { x: 12, y: 6 } 
         }).setOrigin(0.5);
 
         ctaButton.setInteractive({ useHandCursor: true });
