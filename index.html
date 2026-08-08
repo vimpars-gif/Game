@@ -16,8 +16,8 @@
         html, body {
             margin: 0;
             padding: 0;
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
             background-color: #0b1a30;
             overflow: hidden;
             display: flex;
@@ -75,7 +75,6 @@
     function preload() {
         this.load.image('playerCardAsset', 'aaib_card.png');
 
-        // عناصر النقاط والعوائق
         let coinGraphics = this.make.graphics({x: 0, y: 0, add: false});
         coinGraphics.fillStyle(0xffd700, 1);
         coinGraphics.fillCircle(15, 15, 15);
@@ -88,13 +87,12 @@
     }
 
     function create() {
-        // مكان الكارت واعتمدنا أبعاد ثابتة للـ Canvas لتفادي الشاشات المخلّة
-        player = this.physics.add.sprite(180, 560, 'playerCardAsset');
+        // تم رفع موضع Y ليكون 480 بدلاً من 560 حتى يظهر الكارت كاملاً أعلى شريط المتصفح
+        player = this.physics.add.sprite(180, 480, 'playerCardAsset');
         
-        // تحديد العرض والارتفاع بوضوح (عرض 90px وارتفاع 55px)
-        player.setDisplaySize(90, 55);
+        // مقاس الكارت المظبوط
+        player.setDisplaySize(100, 60);
         
-        // ضبط الحدود الفيزيائية لتطابق العرض الجديد
         player.body.setSize(player.width, player.height);
         player.setCollideWorldBounds(true);
         player.body.setAllowGravity(false);
@@ -105,12 +103,10 @@
         scoreText = this.add.text(16, 20, 'Score: 0', { fontSize: '20px', fill: '#ffffff', fontWeight: 'bold' });
         timerText = this.add.text(220, 20, 'Time: 30s', { fontSize: '20px', fill: '#ffffff', fontWeight: 'bold' });
 
-        // التفاعل بالتاتش
         this.input.on('pointermove', function (pointer) {
             if (!isGameOver) {
-                // تحويل إحداثيات التاتش لإحداثيات الكانفاس الداخلية
-                let touchX = pointer.x;
-                player.x = Phaser.Math.Clamp(touchX, 45, 315);
+                // تحريك الكارت يمين وشمال مع الحفاظ على الحدود
+                player.x = Phaser.Math.Clamp(pointer.x, 50, 310);
             }
         });
 
