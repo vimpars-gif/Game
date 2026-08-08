@@ -83,7 +83,10 @@
     function create() {
         // Add AAIB Card Player
         player = this.physics.add.sprite(180, 580, 'playerCardAsset');
-        player.setScale(0.5); // Adjust size to fit screen
+        
+        // --- Adjust size to match the original paddle (80x50 px) ---
+        player.setDisplaySize(80, 50); 
+        
         player.setCollideWorldBounds(true);
         player.body.setAllowGravity(false);
 
